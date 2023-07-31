@@ -14,7 +14,7 @@ class Program
             string message = string.Empty;
             do
             {
-                SendMessage(connection, message);
+                SendNewMessage(connection, message);
                 Console.Write("Enter your next message:");
                 message = Console.ReadLine();
             } 
@@ -27,12 +27,19 @@ class Program
             return;
         using (var channel = connection.CreateModel())
         {
-            channel.QueueDeclare(queue: "hello",
+            channel.ExchangeDeclare("SalesOrder", ExchangeType.Fanout);
+
+            var result = channel.QueueDeclare(queue: "hello",
                                  durable: false,
                                  exclusive: false,
                                  autoDelete: false,
                                  arguments: null); var body =
                                     Encoding.UTF8.GetBytes(message);
+
+            string queueName = result.QueueName;
+
+            channel.QueueBind(queueName, "SalesOrder", "");
+
             var properties = channel.CreateBasicProperties();
             properties.Persistent = true;
             channel.BasicPublish(exchange: "",
@@ -40,6 +47,18 @@ class Program
                                  basicProperties: properties,
                                  body: body);
             Console.WriteLine(" [x] Sent {0}", message);
+        }
+    }
+
+    private static void SendNewMessage(IConnection connection, string message)
+    {
+        if (string.IsNullOrEmpty(message))
+            return;
+        using (var channel = connection.CreateModel())
+        {
+            channel.ExchangeDeclare("SalesOrder", ExchangeType.Fanout);
+
+            channel.BasicPublish("SalesOrder", "", false, null, Encoding.UTF8.GetBytes(message));
         }
     }
 }
